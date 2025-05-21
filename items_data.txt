@@ -19,14 +19,5 @@
     "type": "kitchen",
     "price": 300.0
   },
-  {
-    "name": "machine",
-    "type": "simple",
-    "price": 565664.0
-  },
-  {
-    "name": "katori 2 mg",
-    "type": "katori",
-    "price": 78.0
-  }
+ 
 ]
