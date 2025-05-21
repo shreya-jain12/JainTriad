@@ -39,21 +39,6 @@ def load_items():
         st.session_state["items"] = []
 
 # --- Helper Functions for Users (Plain Text Password) ---
-def save_user(username, password):
-    with open(USER_FILE, "a", encoding="utf-8") as f:
-        f.write(f"{username},{password}\n")
-
-def user_exists(username):
-    try:
-        with open(USER_FILE, "r", encoding="utf-8") as f:
-            for line in f:
-                u, _ = line.strip().split(",", 1)
-                if u == username:
-                    return True
-    except Exception:
-        pass
-    return False
-
 def check_login(username, password):
     try:
         with open(USER_FILE, "r", encoding="utf-8") as f:
@@ -80,7 +65,7 @@ st.sidebar.selectbox(
     on_change=lambda: st.session_state.update({"lang": "en" if st.session_state["lang_select"] == "English" else "hi"})
 )
 
-# --- Login/Register State ---
+# --- Login State ---
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
 if "username" not in st.session_state:
@@ -92,15 +77,7 @@ if "data_loaded" not in st.session_state:
     load_items()
     st.session_state["data_loaded"] = True
 
-# --- Safe Image Loader ---
-def safe_image(path, caption, subcaption=None):
-    col = st.columns([1,1,1])
-    with col[1]:
-        st.image(path, width=120, caption=caption)
-        if subcaption:
-            st.markdown(f"<div style='text-align:center;font-weight:bold'>{subcaption}</div>", unsafe_allow_html=True)
-
-# --- Login/Register Page ---
+# --- Login Page (Register option removed) ---
 if not st.session_state["logged_in"]:
     st.title("JAINTRIAD")
     st.markdown("<h3 style='color:#444;'>Utensil & Electronics Business</h3>", unsafe_allow_html=True)
@@ -116,36 +93,17 @@ if not st.session_state["logged_in"]:
     with col3:
         pass
 
-    tab1, tab2 = st.tabs([t("Login", "लॉगिन"), t("Register", "रजिस्टर")])
-
-    with tab1:
-        login_user = st.text_input(t("Username", "यूज़रनेम"), key="login_user")
-        login_pass = st.text_input(t("Password", "पासवर्ड"), type="password", key="login_pass")
-        if st.button(t("Login", "लॉगिन")):
-            if check_login(login_user, login_pass):
-                st.session_state["logged_in"] = True
-                st.session_state["username"] = login_user
-                st.success(t("Login successful!", "लॉगिन सफल!"))
-                st.rerun()
-                st.stop()
-            else:
-                st.error(t("Invalid username or password.", "गलत यूज़रनेम या पासवर्ड।"))
-
-    with tab2:
-        reg_user = st.text_input(t("Username", "यूज़रनेम"), key="reg_user")
-        reg_pass = st.text_input(t("Password", "पासवर्ड"), type="password", key="reg_pass")
-        reg_pass2 = st.text_input(t("Confirm Password", "पासवर्ड दोबारा"), type="password", key="reg_pass2")
-        if st.button(t("Register", "रजिस्टर")):
-            if not reg_user or not reg_pass:
-                st.warning(t("Please fill all fields.", "सभी फ़ील्ड भरें।"))
-            elif user_exists(reg_user):
-                st.error(t("Username already exists.", "यूज़रनेम पहले से मौजूद है।"))
-            elif reg_pass != reg_pass2:
-                st.error(t("Passwords do not match.", "पासवर्ड मेल नहीं खाते।"))
-            else:
-                save_user(reg_user, reg_pass)
-                st.success(t("Registration successful! Please login.", "रजिस्ट्रेशन सफल! कृपया लॉगिन करें।"))
-
+    st.header(t("Login", "लॉगिन"))
+    login_user = st.text_input(t("Username", "यूज़रनेम"), key="login_user")
+    login_pass = st.text_input(t("Password", "पासवर्ड"), type="password", key="login_pass")
+    if st.button(t("Login", "लॉगिन")):
+        if check_login(login_user, login_pass):
+            st.session_state["logged_in"] = True
+            st.session_state["username"] = login_user
+            st.success(t("Login successful!", "लॉगिन सफल!"))
+            st.rerun()
+        else:
+            st.error(t("Invalid username or password.", "गलत यूज़रनेम या पासवर्ड।"))
     st.stop()
 
 # --- Main App (after login) ---
@@ -187,7 +145,17 @@ if menu == t("Customers", "ग्राहक"):
     q = st.text_input(t("Search by name/phone/email", "नाम/फोन/ईमेल से खोजें"), value="")
     for idx, c in enumerate(st.session_state["customers"]):
         if not q or q.lower() in c["name"].lower() or q in c["phone"] or q.lower() in c["email"].lower():
-            st.write(f"{c['name']} | {c['phone']} | {c['email']} | {c['address']}")
+            col1, col2 = st.columns([5,1])
+            with col1:
+                st.write(f"{c['name']} | {c['phone']} | {c['email']} | {c['address']}")
+            with col2:
+                if st.button(t("Delete", "हटाएं"), key=f"delete_customer_{idx}"):
+                    # Delete customer and their bills
+                    del st.session_state["customers"][idx]
+                    st.session_state["bills"] = [b for b in st.session_state["bills"] if b["customer"] != c["name"]]
+                    save_data()
+                    st.success(t("Customer deleted!", "ग्राहक हटा दिया गया!"))
+                    st.rerun()
             with st.expander(t("Show Details & Past Bills", "विवरण और पिछले बिल")):
                 st.write(f"**{t('Name','नाम')}:** {c['name']}")
                 st.write(f"**{t('Phone','फोन')}:** {c['phone']}")
@@ -227,7 +195,6 @@ elif menu == t("Items", "सामान"):
                 st.rerun()
 
     st.subheader(t("All Items", "सभी सामान"))
-    # Search box for items
     item_search = st.text_input(t("Search Items by Name/Type", "नाम/प्रकार से सामान खोजें"), value="", key="item_search")
     filtered_items = [
         (idx, i) for idx, i in enumerate(st.session_state["items"])
@@ -264,7 +231,6 @@ elif menu == t("Bills", "बिल"):
     bill_download_data = None
     bill_download_name = ""
     bill_download_key = ""
-    # Only show info if customers or items are really empty (with valid name/type)
     valid_customers = [c for c in st.session_state["customers"] if c.get("name")]
     valid_items = [i for i in st.session_state["items"] if i.get("name") and i.get("type")]
     if len(valid_customers) == 0 or len(valid_items) == 0:
@@ -366,43 +332,31 @@ elif menu == t("Bills", "बिल"):
 
 # --- Khaata (Ledger) ---
 elif menu == t("Khaata", "खाता"):
-    st.header(t("Customer Khaata", "ग्राहक खाता"))
-
-    # Search box for customer name or phone
-    khaata_search = st.text_input(t("Search Customer by Name/Phone", "नाम/फोन से ग्राहक खोजें"), value="", key="khaata_search")
-    filtered_customers = [
-        c for c in st.session_state["customers"]
-        if not khaata_search or khaata_search.lower() in c["name"].lower() or khaata_search in c["phone"]
-    ]
-
-    if not filtered_customers:
-        st.info(t("No customer found.", "कोई ग्राहक नहीं मिला।"))
-    for idx, c in enumerate(filtered_customers):
-        st.subheader(f"{c['name']} ({c['phone']})")
-        bills = [b for b in st.session_state["bills"] if b["customer"] == c["name"]]
+    st.header(t("Customer Ledger", "ग्राहक खाता"))
+    st.subheader(t("Select Customer", "ग्राहक चुनें"))
+    cust_names = [c["name"] for c in st.session_state["customers"] if c.get("name")]
+    if not cust_names:
+        st.info(t("No customers found.", "कोई ग्राहक नहीं मिला।"))
+    else:
+        selected_cust = st.selectbox(t("Customer", "ग्राहक"), cust_names)
+        bills = [b for b in st.session_state["bills"] if b["customer"] == selected_cust]
+        total_due = sum(b["total"] for b in bills if b["paid"] == t("Unpaid", "अदायगी"))
         total_paid = sum(b["total"] for b in bills if b["paid"] == t("Paid", "भुगतान"))
-        total_unpaid = sum(b["total"] for b in bills if b["paid"] == t("Unpaid", "अदायगी"))
-        st.write(f"{t('Total Paid','कुल भुगतान')}: ₹{total_paid}")
-        st.write(f"{t('Total Pending','कुल बकाया')}: ₹{total_unpaid}")
-        for b_idx, b in enumerate(bills):
-            with st.expander(f"{b['date']} | ₹{b['total']} | {b['paid']} | {t('Show Details', 'विवरण देखें')}"):
-                st.write(f"**{t('Date','तारीख')}:** {b['date']}")
-                st.write(f"**{t('Status','स्थिति')}:** {b['paid']}")
-                st.write("**Items:**")
-                for item in b["items"]:
-                    st.write(f"- {item['name']} ({item['type']}) x {item.get('qty', 1)} = ₹{item.get('subtotal', item['price']*item.get('qty',1))}")
-                st.write(f"**{t('Total','कुल')}: ₹{b['total']}**")
-        khaata_txt = f"{t('Name','नाम')}: {c['name']}\n{t('Phone','फोन')}: {c['phone']}\n"
-        khaata_txt += f"{t('Total Paid','कुल भुगतान')}: ₹{total_paid}\n{t('Total Pending','कुल बकाया')}: ₹{total_unpaid}\n\n{t('Bills','बिल')}:\n"
-        for b in bills:
-            khaata_txt += f"- {b['date']} | ₹{b['total']} | {b['paid']}\n"
+        st.write(f"**{t('Total Bills','कुल बिल')}:** {len(bills)}")
+        st.write(f"**{t('Total Paid','कुल भुगतान')}: ₹{total_paid}**")
+        st.write(f"**{t('Total Due','कुल बकाया')}: ₹{total_due}**")
+        st.subheader(t("All Bills for this Customer", "इस ग्राहक के सभी बिल"))
+        for idx, b in enumerate(bills):
+            st.write(f"{b['date']} | ₹{b['total']} | {b['paid']}")
+            bill_txt = f"{t('Customer','ग्राहक')}: {b['customer']}\n{t('Date','तारीख')}: {b['date']}\n{t('Items','सामान')}:\n"
             for item in b["items"]:
                 qty = item.get("qty", 1)
                 subtotal = item.get("subtotal", item["price"] * qty)
-                khaata_txt += f"    - {item['name']} ({item['type']}) x {qty} = ₹{subtotal}\n"
-        st.download_button(
-            t("Download Khaata", "खाता डाउनलोड करें"),
-            khaata_txt,
-            file_name=f"{c['name']}_khaata.txt",
-            key=f"khaata_{c['name']}_{idx}"
-        )
+                bill_txt += f"- {item['name']} ({item['type']}) x {qty} = ₹{subtotal}\n"
+            bill_txt += f"{t('Total','कुल')}: ₹{b['total']}\n{t('Status','स्थिति')}: {b['paid']}\n"
+            st.download_button(
+                t("Download Bill", "बिल डाउनलोड करें"),
+                bill_txt,
+                file_name=f"{b['customer']}_{b['date'].replace(':','-').replace(' ','_')}_bill.txt",
+                key=f"khaata_{b['customer']}_{b['date']}_{idx}"
+            )
