@@ -3,6 +3,8 @@ from datetime import datetime
 import json
 import os
 import re
+from fpdf import FPDF
+import tempfile
 
 DATA_FILE = "khataa_data.txt"
 ITEM_FILE = "items_data.txt"
@@ -49,6 +51,79 @@ def check_login(username, password):
     except Exception:
         pass
     return False
+
+# --- PDF GENERATION HELPERS ---
+def generate_customers_pdf(customers):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    pdf.cell(0, 10, "All Customers", ln=True, align="L")
+    for c in customers:
+        pdf.multi_cell(0, 8, f"Name: {c['name']}\nPhone: {c['phone']}\nEmail: {c['email']}\nAddress: {c['address']}\n", border=1)
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmpfile:
+        pdf.output(tmpfile.name)
+        tmpfile.seek(0)
+        pdf_bytes = tmpfile.read()
+    return pdf_bytes
+
+def generate_items_pdf(items):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    pdf.cell(0, 10, "All Items", ln=True, align="L")
+    for i in items:
+        pdf.multi_cell(0, 8, f"Name: {i['name']}\nType: {i['type']}\nPrice: Rs.{i['price']}\n", border=1)
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmpfile:
+        pdf.output(tmpfile.name)
+        tmpfile.seek(0)
+        pdf_bytes = tmpfile.read()
+    return pdf_bytes
+
+def generate_bills_pdf(bills):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    pdf.cell(0, 10, "All Bills", ln=True, align="L")
+    for b in bills:
+        bill_str = f"Customer: {b['customer']}\nDate: {b['date']}\nTotal: Rs.{b['total']}\nPaid: {b['paid']}\nItems:\n"
+        for item in b['items']:
+            bill_str += f"  - {item['name']} ({item['type']}) x {item.get('qty',1)} = Rs.{item.get('subtotal',item['price'])}\n"
+        pdf.multi_cell(0, 8, bill_str, border=1)
+        pdf.ln(2)
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmpfile:
+        pdf.output(tmpfile.name)
+        tmpfile.seek(0)
+        pdf_bytes = tmpfile.read()
+    return pdf_bytes
+
+def generate_all_data_pdf(customers, items, bills):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+
+    pdf.cell(0, 10, "All Customers", ln=True, align="L")
+    for c in customers:
+        pdf.multi_cell(0, 8, f"Name: {c['name']}\nPhone: {c['phone']}\nEmail: {c['email']}\nAddress: {c['address']}\n", border=1)
+    pdf.ln(5)
+
+    pdf.cell(0, 10, "All Items", ln=True, align="L")
+    for i in items:
+        pdf.multi_cell(0, 8, f"Name: {i['name']}\nType: {i['type']}\nPrice: Rs.{i['price']}\n", border=1)
+    pdf.ln(5)
+
+    pdf.cell(0, 10, "All Bills", ln=True, align="L")
+    for b in bills:
+        bill_str = f"Customer: {b['customer']}\nDate: {b['date']}\nTotal: Rs.{b['total']}\nPaid: {b['paid']}\nItems:\n"
+        for item in b['items']:
+            bill_str += f"  - {item['name']} ({item['type']}) x {item.get('qty',1)} = Rs.{item.get('subtotal',item['price'])}\n"
+        pdf.multi_cell(0, 8, bill_str, border=1)
+        pdf.ln(2)
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmpfile:
+        pdf.output(tmpfile.name)
+        tmpfile.seek(0)
+        pdf_bytes = tmpfile.read()
+    return pdf_bytes
 
 # --- Language Support (Simple Toggle) ---
 if "lang" not in st.session_state:
@@ -164,16 +239,26 @@ if menu == t("Customers", "ग्राहक"):
                 cust_bills = [b for b in st.session_state["bills"] if b["customer"] == c["name"]]
                 st.write(f"**{t('Total Bills','कुल बिल')}:** {len(cust_bills)}")
                 for b in cust_bills:
-                    st.write(f"- {b['date']} | ₹{b['total']} | {b['paid']}")
+                    st.write(f"- {b['date']} | Rs.{b['total']} | {b['paid']}")
                 cust_txt = f"{t('Name','नाम')}: {c['name']}\n{t('Phone','फोन')}: {c['phone']}\n{t('Email','ईमेल')}: {c['email']}\n{t('Address','पता')}: {c['address']}\n\n{t('Past Bills','पिछले बिल')}:\n"
                 for b in cust_bills:
-                    cust_txt += f"- {b['date']} | ₹{b['total']} | {b['paid']}\n"
+                    cust_txt += f"- {b['date']} | Rs.{b['total']} | {b['paid']}\n"
                 st.download_button(
                     t("Download Details & Bills", "विवरण और बिल डाउनलोड करें"),
                     cust_txt,
                     file_name=f"{c['name']}_details.txt",
                     key=f"cust_{c['name']}_{idx}_details"
                 )
+
+    # --- Customers PDF Download Button ---
+    if st.button(t("Download All Customers (PDF)", "सभी ग्राहक PDF डाउनलोड करें")):
+        pdf_bytes = generate_customers_pdf(st.session_state["customers"])
+        st.download_button(
+            label=t("Click here to download Customers PDF", "ग्राहक PDF डाउनलोड करें"),
+            data=pdf_bytes,
+            file_name="all_customers.pdf",
+            mime="application/pdf"
+        )
 
 # --- Items ---
 elif menu == t("Items", "सामान"):
@@ -203,7 +288,7 @@ elif menu == t("Items", "सामान"):
     for idx, i in filtered_items:
         col1, col2, col3, col4 = st.columns([3, 2, 2, 2])
         with col1:
-            st.write(f"{i['name']} | {i['type']} | ₹{i['price']}")
+            st.write(f"{i['name']} | {i['type']} | Rs.{i['price']}")
         with col2:
             new_price = st.number_input(
                 t("Update Price", "कीमत बदलें"),
@@ -224,6 +309,16 @@ elif menu == t("Items", "सामान"):
                 save_items()
                 st.success(t("Item deleted!", "सामान हटा दिया गया!"))
                 st.rerun()
+
+    # --- Items PDF Download Button ---
+    if st.button(t("Download All Items (PDF)", "सभी सामान PDF डाउनलोड करें")):
+        pdf_bytes = generate_items_pdf(st.session_state["items"])
+        st.download_button(
+            label=t("Click here to download Items PDF", "सामान PDF डाउनलोड करें"),
+            data=pdf_bytes,
+            file_name="all_items.pdf",
+            mime="application/pdf"
+        )
 
 # --- Bills ---
 elif menu == t("Bills", "बिल"):
@@ -290,13 +385,13 @@ elif menu == t("Bills", "बिल"):
                 st.write(f"**{t('Date','तारीख')}:** {bill['date']}")
                 st.write("**Items:**")
                 for b in bill_items:
-                    st.write(f"- {b['name']} ({b['type']}) x {b['qty']} = ₹{b['subtotal']}")
-                st.write(f"**{t('Total','कुल')}: ₹{total}**")
+                    st.write(f"- {b['name']} ({b['type']}) x {b['qty']} = Rs.{b['subtotal']}")
+                st.write(f"**{t('Total','कुल')}: Rs.{total}**")
                 st.write(f"**{t('Status','स्थिति')}: {paid}**")
                 bill_txt = f"{t('Customer','ग्राहक')}: {cust}\n{t('Date','तारीख')}: {bill['date']}\n{t('Items','सामान')}:\n"
                 for b in bill_items:
-                    bill_txt += f"- {b['name']} ({b['type']}) x {b['qty']} = ₹{b['subtotal']}\n"
-                bill_txt += f"{t('Total','कुल')}: ₹{total}\n{t('Status','स्थिति')}: {paid}\n"
+                    bill_txt += f"- {b['name']} ({b['type']}) x {b['qty']} = Rs.{b['subtotal']}\n"
+                bill_txt += f"{t('Total','कुल')}: Rs.{total}\n{t('Status','स्थिति')}: {paid}\n"
                 bill_download_data = bill_txt
                 bill_download_name = f"{cust}_{bill['date'].replace(':','-').replace(' ','_')}_bill.txt"
                 bill_download_key = f"bill_{cust}_{bill['date']}"
@@ -316,18 +411,28 @@ elif menu == t("Bills", "बिल"):
             key="all_bills_json"
         )
     for idx, b in enumerate(st.session_state["bills"]):
-        st.write(f"{b['customer']} | {b['date']} | ₹{b['total']} | {b['paid']}")
+        st.write(f"{b['customer']} | {b['date']} | Rs.{b['total']} | {b['paid']}")
         bill_txt = f"{t('Customer','ग्राहक')}: {b['customer']}\n{t('Date','तारीख')}: {b['date']}\n{t('Items','सामान')}:\n"
         for item in b["items"]:
             qty = item.get("qty", 1)
             subtotal = item.get("subtotal", item["price"] * qty)
-            bill_txt += f"- {item['name']} ({item['type']}) x {qty} = ₹{subtotal}\n"
-        bill_txt += f"{t('Total','कुल')}: ₹{b['total']}\n{t('Status','स्थिति')}: {b['paid']}\n"
+            bill_txt += f"- {item['name']} ({item['type']}) x {qty} = Rs.{subtotal}\n"
+        bill_txt += f"{t('Total','कुल')}: Rs.{b['total']}\n{t('Status','स्थिति')}: {b['paid']}\n"
         st.download_button(
             t("Download Bill", "बिल डाउनलोड करें"),
             bill_txt,
             file_name=f"{b['customer']}_{b['date'].replace(':','-').replace(' ','_')}_bill.txt",
             key=f"allbills_{b['customer']}_{b['date']}_{idx}"
+        )
+
+    # --- Bills PDF Download Button ---
+    if st.button(t("Download All Bills (PDF)", "सभी बिल PDF डाउनलोड करें")):
+        pdf_bytes = generate_bills_pdf(st.session_state["bills"])
+        st.download_button(
+            label=t("Click here to download Bills PDF", "बिल PDF डाउनलोड करें"),
+            data=pdf_bytes,
+            file_name="all_bills.pdf",
+            mime="application/pdf"
         )
 
 # --- Khaata (Ledger) ---
@@ -343,20 +448,35 @@ elif menu == t("Khaata", "खाता"):
         total_due = sum(b["total"] for b in bills if b["paid"] == t("Unpaid", "अदायगी"))
         total_paid = sum(b["total"] for b in bills if b["paid"] == t("Paid", "भुगतान"))
         st.write(f"**{t('Total Bills','कुल बिल')}:** {len(bills)}")
-        st.write(f"**{t('Total Paid','कुल भुगतान')}: ₹{total_paid}**")
-        st.write(f"**{t('Total Due','कुल बकाया')}: ₹{total_due}**")
+        st.write(f"**{t('Total Paid','कुल भुगतान')}: Rs.{total_paid}**")
+        st.write(f"**{t('Total Due','कुल बकाया')}: Rs.{total_due}**")
         st.subheader(t("All Bills for this Customer", "इस ग्राहक के सभी बिल"))
         for idx, b in enumerate(bills):
-            st.write(f"{b['date']} | ₹{b['total']} | {b['paid']}")
+            st.write(f"{b['date']} | Rs.{b['total']} | {b['paid']}")
             bill_txt = f"{t('Customer','ग्राहक')}: {b['customer']}\n{t('Date','तारीख')}: {b['date']}\n{t('Items','सामान')}:\n"
             for item in b["items"]:
                 qty = item.get("qty", 1)
                 subtotal = item.get("subtotal", item["price"] * qty)
-                bill_txt += f"- {item['name']} ({item['type']}) x {qty} = ₹{subtotal}\n"
-            bill_txt += f"{t('Total','कुल')}: ₹{b['total']}\n{t('Status','स्थिति')}: {b['paid']}\n"
+                bill_txt += f"- {item['name']} ({item['type']}) x {qty} = Rs.{subtotal}\n"
+            bill_txt += f"{t('Total','कुल')}: Rs.{b['total']}\n{t('Status','स्थिति')}: {b['paid']}\n"
             st.download_button(
                 t("Download Bill", "बिल डाउनलोड करें"),
                 bill_txt,
                 file_name=f"{b['customer']}_{b['date'].replace(':','-').replace(' ','_')}_bill.txt",
                 key=f"khaata_{b['customer']}_{b['date']}_{idx}"
             )
+
+# --- Download All Data as PDF (Sidebar) ---
+all_customers = st.session_state.get("customers", [])
+all_items = st.session_state.get("items", [])
+all_bills = st.session_state.get("bills", [])
+
+st.sidebar.markdown("---")
+if st.sidebar.button(t("Download All Data (PDF)", "सारी जानकारी डाउनलोड करें (PDF)")):
+    pdf_bytes = generate_all_data_pdf(all_customers, all_items, all_bills)
+    st.sidebar.download_button(
+        label=t("Click here to download PDF", "PDF डाउनलोड करें"),
+        data=pdf_bytes,
+        file_name="all_khataa_data.pdf",
+        mime="application/pdf"
+    )
