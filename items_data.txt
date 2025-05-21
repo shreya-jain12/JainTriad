@@ -1,0 +1,32 @@
+[
+  {
+    "name": "plate",
+    "type": "kitchen",
+    "price": 50.0
+  },
+  {
+    "name": "bowl",
+    "type": "kitchen",
+    "price": 100.0
+  },
+  {
+    "name": "tiffin",
+    "type": "kitchen",
+    "price": 150.0
+  },
+  {
+    "name": "bottle",
+    "type": "kitchen",
+    "price": 300.0
+  },
+  {
+    "name": "machine",
+    "type": "simple",
+    "price": 565664.0
+  },
+  {
+    "name": "katori 2 mg",
+    "type": "katori",
+    "price": 78.0
+  }
+]
