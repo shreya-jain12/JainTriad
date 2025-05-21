@@ -160,7 +160,13 @@ if not st.session_state["logged_in"]:
     col1, col2, col3 = st.columns([1,1,1])
     with col1:
         pass
-    
+    with col2:
+        st.image("husband.jpg", width=120)
+        st.markdown("<div style='text-align:center;font-weight:bold'>Husband and Wife</div>", unsafe_allow_html=True)
+        st.image("son.jpg", width=120)
+        st.markdown("<div style='text-align:center;font-weight:bold'>Tarun Jain</div>", unsafe_allow_html=True)
+    with col3:
+        pass
 
     st.header(t("Login", "लॉगिन"))
     login_user = st.text_input(t("Username", "यूज़रनेम"), key="login_user")
