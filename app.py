@@ -156,14 +156,7 @@ if "data_loaded" not in st.session_state:
 if not st.session_state["logged_in"]:
     st.title("JAINTRIAD")
     st.markdown("<h3 style='color:#444;'>Utensil & Electronics Business</h3>", unsafe_allow_html=True)
-    # Images in center, with captions
-    col1, col3 = st.columns([1,1])
-    with col1:
-        pass
-   
-    with col2:
-        pass
-
+  
     st.header(t("Login", "लॉगिन"))
     login_user = st.text_input(t("Username", "यूज़रनेम"), key="login_user")
     login_pass = st.text_input(t("Password", "पासवर्ड"), type="password", key="login_pass")
